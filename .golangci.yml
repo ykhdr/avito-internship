@@ -1,0 +1,133 @@
+linters-settings:
+  misspell:
+    locale: US
+  revive:
+    ignore-generated-header: true
+    severity: warning
+    rules:
+      - name: var-naming
+        severity: warning
+        arguments:
+          - - ID
+            - IDS
+            - UI
+            - URL
+            - URI
+            - API
+            - JSON
+            - SQL
+            - HTTP
+            - TLS
+            - SSL
+            - UUID
+            - SMTP
+            - IP
+      - name: line-length-limit
+        severity: warning
+        arguments: [ 140 ]
+      - name: unexported-return
+        severity: warning
+      - name: errorf
+        severity: warning
+      - name: blank-imports
+        severity: warning
+      - name: context-as-argument
+        severity: warning
+      - name: error-return
+        severity: warning
+      - name: error-strings
+        severity: warning
+      - name: error-naming
+        severity: warning
+      - name: if-return
+        severity: warning
+      - name: increment-decrement
+        severity: warning
+      - name: range
+        severity: warning
+      - name: indent-error-flow
+        severity: warning
+      - name: empty-block
+        severity: warning
+      - name: superfluous-else
+        severity: warning
+      - name: confusing-naming
+        severity: warning
+      - name: get-return
+        severity: warning
+      - name: deep-exit
+        severity: warning
+      - name: unused-parameter
+        severity: warning
+      - name: unreachable-code
+        severity: warning
+#      - name: flag-parameter
+#        severity: warning
+      - name: unnecessary-stmt
+        disabled: true
+      - name: struct-tag
+        severity: warning
+      - name: constant-logical-expr
+        severity: warning
+      - name: bool-literal-in-expr
+        severity: warning
+      - name: atomic
+        severity: warning
+      - name: string-of-int
+        severity: warning
+      - name: early-return
+        severity: warning
+      - name: unconditional-recursion
+        severity: warning
+      - name: identical-branches
+        severity: warning
+  gocritic:
+    disabled-checks:
+      - commentFormatting
+  govet:
+    enable-all: true
+    disable:
+      - fieldalignment
+  cyclop:
+    max-complexity: 15
+linters:
+  disable:
+    - typecheck
+  enable:
+    - misspell
+    - govet
+    - revive
+    - ineffassign
+    - gosimple
+    - unparam
+    - unused
+    - asciicheck
+    - dogsled
+    - dupl
+    - gosec
+    - whitespace
+    - cyclop
+    - contextcheck
+    - bidichk
+    - errname
+    - nilnil
+    - durationcheck
+    - unconvert
+    - gocritic
+    - forbidigo
+
+issues:
+  exclude-use-default: false
+  exclude:
+      - comment on exported function
+      - comment on exported type
+      - should have comment
+      - use leading k in Go names
+      - comment on exported const
+  exclude-dirs:
+    - pkg
+    - "src/api/.*"
+    - "mocks"
+run:
+  tests: false
+  timeout: 5m
