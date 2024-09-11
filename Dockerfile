@@ -1,13 +1,28 @@
 FROM golang:1.23-alpine AS builder
 
-WORKDIR /app
-COPY src  /app/
-RUN go mod download
-RUN go build -o service main.go
+ENV CGO_ENABLED 0
+ENV GOOS linux
 
-EXPOSE 8080
+RUN apk update --no-cache
+
+WORKDIR /build
+COPY src/go.mod .
+COPY src/go.sum .
+
+RUN go mod download
+
+COPY src/ .
+
+RUN go build -ldflags="-s -w" -o /app/service
+
+RUN go build -o service main.go
 
 
 FROM alpine:3.19.1
+
+WORKDIR /app
+
+EXPOSE 8080
+
 COPY --from=builder /app/service /app/service
-ENTRYPOINT ["/app/service"]
+CMD ["./service"]
