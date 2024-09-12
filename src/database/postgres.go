@@ -46,7 +46,7 @@ func (c *postgresConnector) IsEmployeeExists(ctx context.Context, username strin
 	return rows.Next(), nil
 }
 
-func NewPostgresConnector(cfg *config.Config) (Connector, error) {
+func NewPostgresConnector(cfg *config.Config) (OrganizationConnector, error) {
 	pgxConfig, err := pgxpool.ParseConfig(cfg.PostgresConn)
 	if err != nil {
 		return nil, err

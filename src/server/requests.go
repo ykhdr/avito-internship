@@ -7,3 +7,9 @@ type TenderRequest struct {
 	OrganizationId  string `json:"organizationId"`
 	CreatorUsername string `json:"creatorUsername"`
 }
+
+type TenderEditRequest struct {
+	Name        string `json:"name,omitempty"`
+	Description string `json:"description,omitempty"`
+	ServiceType string `json:"serviceType,omitempty"`
+}
