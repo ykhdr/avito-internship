@@ -3,6 +3,8 @@ package database
 import (
 	"context"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/pkg/errors"
+	"log/slog"
 	"zadanie-6105/config"
 	"zadanie-6105/model"
 )
@@ -12,13 +14,51 @@ type postgresConnector struct {
 }
 
 func (c *postgresConnector) GetEmployeeByUsername(ctx context.Context, username string) (*model.Employee, error) {
-	//TODO implement me
-	panic("implement me")
+	query := `
+	SELECT id, username, first_name, last_name, created_at, updated_at
+	FROM employee
+	WHERE username = $1
+	`
+	rows, err := c.pool.Query(ctx, query, username)
+	if err != nil {
+		slog.Warn("error db query", "error", err, "query", query)
+		return nil, errors.New("error db query")
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		return nil, nil
+	}
+	var employee model.Employee
+	err = rows.Scan(&employee.ID, &employee.Username, &employee.FirstName, &employee.LastName, &employee.CreatedAt, &employee.UpdatedAt)
+	if err != nil {
+		slog.Warn("error scan", "error", err)
+		return nil, errors.New("error scan")
+	}
+	return &employee, nil
 }
 
 func (c *postgresConnector) GetOrganizationById(ctx context.Context, id int) (*model.Organization, error) {
-	//TODO implement me
-	panic("implement me")
+	query := `
+	SELECT id, name, description, type, created_at, updated_at
+	FROM organization
+	WHERE id = $1
+	`
+	rows, err := c.pool.Query(ctx, query, id)
+	if err != nil {
+		slog.Warn("error db query", "error", err, "query", query)
+		return nil, errors.New("error db query")
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		return nil, nil
+	}
+	var organization model.Organization
+	err = rows.Scan(&organization.ID, &organization.Name, &organization.Description, &organization.Type, &organization.CreatedAt, &organization.UpdatedAt)
+	if err != nil {
+		slog.Warn("error scan", "error", err)
+		return nil, errors.New("error scan")
+	}
+	return &organization, nil
 }
 
 func (c *postgresConnector) IsEmployeeInOrganization(ctx context.Context, username, organizationID string) (bool, error) {
@@ -30,7 +70,8 @@ func (c *postgresConnector) IsEmployeeInOrganization(ctx context.Context, userna
 	`
 	rows, err := c.pool.Query(ctx, query, username, organizationID)
 	if err != nil {
-		return false, err
+		slog.Warn("error db query", "error", err, "query", query)
+		return false, errors.New("error db query")
 	}
 	defer rows.Close()
 	return rows.Next(), nil
@@ -40,7 +81,8 @@ func (c *postgresConnector) IsEmployeeExists(ctx context.Context, username strin
 	query := `SELECT EXISTS (SELECT 1 FROM employee WHERE username = $1)`
 	rows, err := c.pool.Query(ctx, query, username)
 	if err != nil {
-		return false, err
+		slog.Warn("error db query", "error", err, "query", query)
+		return false, errors.New("error db query")
 	}
 	defer rows.Close()
 	return rows.Next(), nil

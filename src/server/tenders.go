@@ -145,6 +145,12 @@ func (s *Server) myTenders(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(resp)
 		return
 	}
+	if employee == nil {
+		w.WriteHeader(http.StatusNotFound)
+		resp := ErrResponse{Reason: "employee not found"}
+		_ = json.NewEncoder(w).Encode(resp)
+		return
+	}
 	tenders := s.tenderStore.GetByCreatorID(limit, offset, employee.ID)
 	resp := tendersToResponse(tenders)
 	_ = json.NewEncoder(w).Encode(resp)
@@ -166,6 +172,12 @@ func (s *Server) tenderStatus(w http.ResponseWriter, r *http.Request) {
 		slog.Warn("error getting employee by username", "error", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		resp := ErrResponse{Reason: "error getting employee by username"}
+		_ = json.NewEncoder(w).Encode(resp)
+		return
+	}
+	if employee == nil {
+		w.WriteHeader(http.StatusNotFound)
+		resp := ErrResponse{Reason: "employee not found"}
 		_ = json.NewEncoder(w).Encode(resp)
 		return
 	}
@@ -212,6 +224,13 @@ func (s *Server) updateTenderStatus(w http.ResponseWriter, r *http.Request) {
 		slog.Warn("error getting employee by username", "error", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		resp := ErrResponse{Reason: "error getting employee by username"}
+		_ = json.NewEncoder(w).Encode(resp)
+		return
+	}
+
+	if employee == nil {
+		w.WriteHeader(http.StatusNotFound)
+		resp := ErrResponse{Reason: "employee not found"}
 		_ = json.NewEncoder(w).Encode(resp)
 		return
 	}
@@ -271,6 +290,12 @@ func (s *Server) editTender(w http.ResponseWriter, r *http.Request) {
 		slog.Warn("error getting employee by username", "error", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		resp := ErrResponse{Reason: "error getting employee by username"}
+		_ = json.NewEncoder(w).Encode(resp)
+		return
+	}
+	if employee == nil {
+		w.WriteHeader(http.StatusNotFound)
+		resp := ErrResponse{Reason: "employee not found"}
 		_ = json.NewEncoder(w).Encode(resp)
 		return
 	}
@@ -344,7 +369,7 @@ func (s *Server) editTender(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (s *Server) rollbackTender(w http.ResponseWriter, r *http.Request) {
+func (s *Server) rollbackVersion(w http.ResponseWriter, r *http.Request) {
 	validator := NewValidator(w, r, s.organizationDb)
 	tenderId := mux.Vars(r)["tenderId"]
 	username := r.URL.Query().Get("username")
@@ -359,6 +384,12 @@ func (s *Server) rollbackTender(w http.ResponseWriter, r *http.Request) {
 		slog.Warn("error getting employee by username", "error", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		resp := ErrResponse{Reason: "error getting employee by username"}
+		_ = json.NewEncoder(w).Encode(resp)
+		return
+	}
+	if employee == nil {
+		w.WriteHeader(http.StatusNotFound)
+		resp := ErrResponse{Reason: "employee not found"}
 		_ = json.NewEncoder(w).Encode(resp)
 		return
 	}

@@ -29,6 +29,7 @@ func NewServer(cfg *config.Config, db database.OrganizationConnector) *Server {
 	s.r.HandleFunc("/tenders/{tenderId}/status", s.tenderStatus).Methods(http.MethodGet)
 	s.r.HandleFunc("/tenders/{tenderId}/status", s.updateTenderStatus).Methods(http.MethodPut)
 	s.r.HandleFunc("/tenders/{tenderId}/edit", s.editTender).Methods(http.MethodPatch)
+	s.r.HandleFunc("/tenders/{tenderId}/rollback/{version}", s.rollbackVersion).Methods(http.MethodPut)
 	return s
 }
 
