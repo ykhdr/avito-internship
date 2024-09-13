@@ -107,12 +107,24 @@ func (v *Validator) ValidatePagination(limit, offset string) (bool, int, int) {
 			_ = json.NewEncoder(v.w).Encode(resp)
 			return false, 0, 0
 		}
+		if limitInt < 1 {
+			v.w.WriteHeader(http.StatusBadRequest)
+			resp := ErrResponse{Reason: "limit is less than 1"}
+			_ = json.NewEncoder(v.w).Encode(resp)
+			return false, 0, 0
+		}
 	}
 	if offset != "" {
 		offsetInt, err = strconv.Atoi(offset)
 		if err != nil {
 			v.w.WriteHeader(http.StatusBadRequest)
 			resp := ErrResponse{Reason: "offset is not a number"}
+			_ = json.NewEncoder(v.w).Encode(resp)
+			return false, 0, 0
+		}
+		if offsetInt < 0 {
+			v.w.WriteHeader(http.StatusBadRequest)
+			resp := ErrResponse{Reason: "offset is less than 0"}
 			_ = json.NewEncoder(v.w).Encode(resp)
 			return false, 0, 0
 		}
