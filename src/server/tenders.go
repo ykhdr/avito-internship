@@ -100,7 +100,7 @@ func (s *Server) newTender(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(resp)
 		return
 	}
-	if !IsValidTenderStatus(req.ServiceType) {
+	if !IsValidServiceType(req.ServiceType) {
 		w.WriteHeader(http.StatusBadRequest)
 		resp := ErrResponse{Reason: "service type is not available"}
 		_ = json.NewEncoder(w).Encode(resp)

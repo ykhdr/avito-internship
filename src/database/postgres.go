@@ -11,6 +11,7 @@ import (
 )
 
 var (
+	ErrEmployeeNotFound     = fmt.Errorf("employee not found")
 	ErrOrganizationNotFound = fmt.Errorf("organization not found")
 	ErrTenderNotFound       = fmt.Errorf("tender not found")
 	ErrTenderAlreadyExists  = fmt.Errorf("tender with same ID already exists")
@@ -34,7 +35,7 @@ func (c *postgresConnector) GetEmployeeByUsername(ctx context.Context, username 
 	}
 	defer rows.Close()
 	if !rows.Next() {
-		return nil, nil
+		return nil, ErrEmployeeNotFound
 	}
 	var employee model.Employee
 	err = rows.Scan(&employee.ID, &employee.Username, &employee.FirstName, &employee.LastName, &employee.CreatedAt, &employee.UpdatedAt)
@@ -58,7 +59,7 @@ func (c *postgresConnector) GetOrganizationById(ctx context.Context, id int) (*m
 	}
 	defer rows.Close()
 	if !rows.Next() {
-		return nil, nil
+		return nil, ErrOrganizationNotFound
 	}
 	var organization model.Organization
 	err = rows.Scan(&organization.ID, &organization.Name, &organization.Description, &organization.Type,
