@@ -49,6 +49,9 @@ func (s *Server) tenders(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if len(serviceType) == 0 {
+		serviceType = availableServiceTypes
+	}
 	tenders, err := s.db.GetTenders(r.Context(), limit, offset, serviceType)
 	if err != nil {
 		slog.Warn("error getting tenders", "error", err)
@@ -75,7 +78,7 @@ func (s *Server) newTender(w http.ResponseWriter, r *http.Request) {
 	isCreatorExists, err := s.db.IsEmployeeExists(r.Context(), req.CreatorUsername)
 	if err != nil {
 		slog.Warn("error checking employee exists", "error", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		w.WriteHeader(http.StatusBadRequest)
 		resp := ErrResponse{Reason: "error checking employee exists"}
 		_ = json.NewEncoder(w).Encode(resp)
 		return
@@ -83,6 +86,40 @@ func (s *Server) newTender(w http.ResponseWriter, r *http.Request) {
 	if !isCreatorExists {
 		w.WriteHeader(http.StatusUnauthorized)
 		resp := ErrResponse{Reason: "employee does not exist"}
+		_ = json.NewEncoder(w).Encode(resp)
+		return
+	}
+	if !IsValidServiceType(req.ServiceType) {
+		w.WriteHeader(http.StatusBadRequest)
+		resp := ErrResponse{Reason: "service type is not available"}
+		_ = json.NewEncoder(w).Encode(resp)
+		return
+	}
+	employee, err := s.db.GetEmployeeByUsername(r.Context(), req.CreatorUsername)
+	if err != nil {
+		if errors.Is(err, database.ErrEmployeeNotFound) {
+			w.WriteHeader(http.StatusNotFound)
+			resp := ErrResponse{Reason: "employee not found"}
+			_ = json.NewEncoder(w).Encode(resp)
+			return
+		}
+		slog.Warn("error getting employee by username", "error", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		resp := ErrResponse{Reason: "error getting employee by username"}
+		_ = json.NewEncoder(w).Encode(resp)
+		return
+	}
+	_, err = s.db.GetOrganizationById(r.Context(), req.OrganizationId)
+	if err != nil {
+		if errors.Is(err, database.ErrOrganizationNotFound) {
+			w.WriteHeader(http.StatusBadRequest)
+			resp := ErrResponse{Reason: "organization not found"}
+			_ = json.NewEncoder(w).Encode(resp)
+			return
+		}
+		slog.Warn("error getting organization by id", "error", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		resp := ErrResponse{Reason: "error getting organization by id"}
 		_ = json.NewEncoder(w).Encode(resp)
 		return
 	}
@@ -100,15 +137,9 @@ func (s *Server) newTender(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(resp)
 		return
 	}
-	if !IsValidServiceType(req.ServiceType) {
-		w.WriteHeader(http.StatusBadRequest)
-		resp := ErrResponse{Reason: "service type is not available"}
-		_ = json.NewEncoder(w).Encode(resp)
-		return
-	}
-	tender := requestToTender(&req)
+	tender := requestToTender(&req, employee.ID)
 	tender.Status = model.TenderCreated
-	if err := s.db.SaveTender(r.Context(), tender); err != nil {
+	if _, err := s.db.SaveTender(r.Context(), tender); err != nil {
 		if errors.Is(err, database.ErrTenderAlreadyExists) {
 			w.WriteHeader(http.StatusBadRequest)
 			resp := ErrResponse{Reason: "tender already exists"}
@@ -145,15 +176,15 @@ func (s *Server) myTenders(w http.ResponseWriter, r *http.Request) {
 	}
 	employee, err := s.db.GetEmployeeByUsername(r.Context(), username)
 	if err != nil {
+		if errors.Is(err, database.ErrEmployeeNotFound) {
+			w.WriteHeader(http.StatusNotFound)
+			resp := ErrResponse{Reason: "employee not found"}
+			_ = json.NewEncoder(w).Encode(resp)
+			return
+		}
 		slog.Warn("error getting employee by username", "error", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		resp := ErrResponse{Reason: "error getting employee by username"}
-		_ = json.NewEncoder(w).Encode(resp)
-		return
-	}
-	if employee == nil {
-		w.WriteHeader(http.StatusNotFound)
-		resp := ErrResponse{Reason: "employee not found"}
 		_ = json.NewEncoder(w).Encode(resp)
 		return
 	}
@@ -240,9 +271,23 @@ func (s *Server) updateTenderStatus(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(resp)
 		return
 	}
+	tenderExists, err := s.db.IsTenderExists(r.Context(), tenderId)
+	if err != nil {
+		slog.Warn("error checking tender exists", "error", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		resp := ErrResponse{Reason: "error checking tender exists"}
+		_ = json.NewEncoder(w).Encode(resp)
+		return
+	}
+	if !tenderExists {
+		w.WriteHeader(http.StatusNotFound)
+		resp := ErrResponse{Reason: "tender not found"}
+		_ = json.NewEncoder(w).Encode(resp)
+		return
+	}
 	tender, err := s.db.GetTenderByID(r.Context(), tenderId)
 	if err != nil {
-		if errors.Is(database.ErrTenderNotFound, err) {
+		if errors.Is(err, database.ErrTenderNotFound) {
 			w.WriteHeader(http.StatusNotFound)
 			resp := ErrResponse{Reason: "tender not found"}
 			_ = json.NewEncoder(w).Encode(resp)
@@ -261,17 +306,16 @@ func (s *Server) updateTenderStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	tender.Status = model.TenderStatus(status)
-
-	if err := s.db.UpdateTender(r.Context(), tender); err != nil {
+	if _, err := s.db.UpdateTender(r.Context(), tender); err != nil {
 		if errors.Is(database.ErrTenderNotFound, err) {
 			w.WriteHeader(http.StatusNotFound)
 			resp := ErrResponse{Reason: "tender not found"}
 			_ = json.NewEncoder(w).Encode(resp)
 			return
 		}
-		slog.Warn("error updating employee", "error", err)
+		slog.Warn("error updating tender", "error", err)
 		w.WriteHeader(http.StatusInternalServerError)
-		resp := ErrResponse{Reason: "error updating employee"}
+		resp := ErrResponse{Reason: "error updating tender"}
 		_ = json.NewEncoder(w).Encode(resp)
 		return
 	}
@@ -319,9 +363,17 @@ func (s *Server) editTender(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(resp)
 		return
 	}
-	if !IsTenderAvailable(tender, employee) {
+	isEmployeeInOrganization, err := s.db.IsEmployeeInOrganization(r.Context(), employee.Username, tender.OrganizationID)
+	if err != nil {
+		slog.Warn("error checking employee in organization", "error", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		resp := ErrResponse{Reason: "error checking employee in organization"}
+		_ = json.NewEncoder(w).Encode(resp)
+		return
+	}
+	if !isEmployeeInOrganization {
 		w.WriteHeader(http.StatusForbidden)
-		resp := ErrResponse{Reason: "tender is not available"}
+		resp := ErrResponse{Reason: "user not in organization. Tender is not available"}
 		_ = json.NewEncoder(w).Encode(resp)
 		return
 	}
@@ -356,7 +408,7 @@ func (s *Server) editTender(w http.ResponseWriter, r *http.Request) {
 		tender.ServiceType = req.ServiceType
 	}
 
-	if err := s.db.UpdateTender(r.Context(), tender); err != nil {
+	if _, err := s.db.UpdateTender(r.Context(), tender); err != nil {
 		if errors.Is(database.ErrTenderNotFound, err) {
 			w.WriteHeader(http.StatusNotFound)
 			resp := ErrResponse{Reason: "tender not found"}
@@ -413,9 +465,17 @@ func (s *Server) rollbackVersion(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(resp)
 		return
 	}
-	if !IsTenderAvailable(tender, employee) {
+	isEmployeeInOrganization, err := s.db.IsEmployeeInOrganization(r.Context(), employee.Username, tender.OrganizationID)
+	if err != nil {
+		slog.Warn("error checking employee in organization", "error", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		resp := ErrResponse{Reason: "error checking employee in organization"}
+		_ = json.NewEncoder(w).Encode(resp)
+		return
+	}
+	if !isEmployeeInOrganization {
 		w.WriteHeader(http.StatusForbidden)
-		resp := ErrResponse{Reason: "tender is not available"}
+		resp := ErrResponse{Reason: "user not in organization. Tender is not available"}
 		_ = json.NewEncoder(w).Encode(resp)
 		return
 	}
@@ -452,13 +512,13 @@ func tendersToResponse(tenders []model.Tender) []*TenderResponse {
 	})
 }
 
-func requestToTender(req *TenderRequest) *model.Tender {
+func requestToTender(req *TenderRequest, creatorId string) *model.Tender {
 	return &model.Tender{
 		Name:           req.Name,
 		Description:    req.Description,
 		ServiceType:    req.ServiceType,
 		OrganizationID: req.OrganizationId,
-		CreatorID:      req.CreatorUsername,
+		CreatorID:      creatorId,
 	}
 }
 

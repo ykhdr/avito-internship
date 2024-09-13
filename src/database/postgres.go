@@ -46,7 +46,7 @@ func (c *postgresConnector) GetEmployeeByUsername(ctx context.Context, username 
 	return &employee, nil
 }
 
-func (c *postgresConnector) GetOrganizationById(ctx context.Context, id int) (*model.Organization, error) {
+func (c *postgresConnector) GetOrganizationById(ctx context.Context, id string) (*model.Organization, error) {
 	query := `
 	SELECT id, name, description, type, created_at, updated_at
 	FROM organization
@@ -100,7 +100,7 @@ func (c *postgresConnector) IsEmployeeExists(ctx context.Context, username strin
 
 func (c *postgresConnector) GetTenders(ctx context.Context, limit, offset int, serviceType []string) ([]model.Tender, error) {
 	query := `
-	SELECT id, name, description, service_type, status, organization_id, created_at, updated_at, creator_id
+	SELECT id, name, description, service_type, status, organization_id, created_at, updated_at, creator_id, version
 	FROM tender
 	WHERE service_type = ANY($1)
 	LIMIT $2 OFFSET $3
@@ -115,7 +115,7 @@ func (c *postgresConnector) GetTenders(ctx context.Context, limit, offset int, s
 	for rows.Next() {
 		var tender model.Tender
 		err = rows.Scan(&tender.ID, &tender.Name, &tender.Description, &tender.ServiceType, &tender.Status,
-			&tender.OrganizationID, &tender.CreatedAt, &tender.UpdatedAt, &tender.CreatorID)
+			&tender.OrganizationID, &tender.CreatedAt, &tender.UpdatedAt, &tender.CreatorID, &tender.Version)
 		if err != nil {
 			slog.Warn("error scan", "error", err)
 			return nil, errors.New("error scan")
@@ -123,6 +123,29 @@ func (c *postgresConnector) GetTenders(ctx context.Context, limit, offset int, s
 		tenders = append(tenders, tender)
 	}
 	return tenders, nil
+}
+
+func (c *postgresConnector) IsTenderExists(ctx context.Context, id string) (bool, error) {
+	query := `SELECT EXISTS (SELECT 1 FROM tender WHERE id = $1)`
+	rows, err := c.pool.Query(ctx, query, id)
+	if err != nil {
+		slog.Warn("error db query", "error", err, "query", query)
+		return false, errors.New("error db query")
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		return false, nil
+	}
+	var exist bool
+	err = rows.Scan(&exist)
+	if err != nil {
+		slog.Warn("error scan", "error", err)
+		return false, errors.New("error scan")
+	}
+	if !exist {
+		return false, nil
+	}
+	return true, nil
 }
 
 func (c *postgresConnector) GetMaxTenderVersion(ctx context.Context, id string) (int, error) {
@@ -149,6 +172,9 @@ func (c *postgresConnector) GetTenderByID(ctx context.Context, id string) (*mode
 	maxVersion, err := c.GetMaxTenderVersion(ctx, id)
 	if err != nil {
 		return nil, err
+	}
+	if maxVersion == 0 {
+		return nil, ErrTenderNotFound
 	}
 	query := `
 	SELECT id, name, description, service_type, version,  status, organization_id, created_at, updated_at, creator_id
@@ -203,29 +229,38 @@ func (c *postgresConnector) GetTendersByCreatorID(ctx context.Context, limit, of
 	return tenders, nil
 }
 
-func (c *postgresConnector) SaveTender(ctx context.Context, t *model.Tender) error {
-	if _, err := c.GetTenderByID(ctx, t.ID); err == nil {
-		return ErrTenderAlreadyExists
-	}
+func (c *postgresConnector) SaveTender(ctx context.Context, t *model.Tender) (*model.Tender, error) {
 	query := `
-	INSERT INTO tender (name, description, service_type, status, organization_id, creator_id)
-	VALUES ($1, $2, $3, $4, $5, $6)
+	INSERT INTO tender (name, description, service_type, status, organization_id, creator_id, version)
+	VALUES ($1, $2, $3, $4, $5, $6, $7)
+	RETURNING id, name, description, service_type, status, organization_id, creator_id, version
 	`
-	_, err := c.pool.Exec(ctx, query, t.Name, t.Description, t.ServiceType, t.Status, t.OrganizationID, t.CreatorID)
-	if err != nil {
-		slog.Warn("error db query", "error", err, "query", query)
-		return errors.New("error db query")
+	if t.Version == 0 {
+		t.Version = 1
 	}
-	return nil
+	row := c.pool.QueryRow(ctx, query, t.Name, t.Description, t.ServiceType, t.Status, t.OrganizationID, t.CreatorID, t.Version)
+	err := row.Scan(&t.ID, &t.Name, &t.Description, &t.ServiceType, &t.Status, &t.OrganizationID, &t.CreatorID, &t.Version)
+	if err != nil {
+		slog.Warn("error scanning row", "error", err, "query", query)
+		return nil, errors.New("error scanning row")
+	}
+	return t, nil
 }
 
-func (c *postgresConnector) UpdateTender(ctx context.Context, t *model.Tender) error {
-	tender, err := c.GetTenderByID(ctx, t.ID)
+func (c *postgresConnector) UpdateTender(ctx context.Context, t *model.Tender) (*model.Tender, error) {
+	t.Version++
+	query := `
+	INSERT INTO tender (id, name, description, service_type, status, organization_id, creator_id, version)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	RETURNING id, name, description, service_type, status, organization_id, creator_id, version
+	`
+	row := c.pool.QueryRow(ctx, query, t.ID, t.Name, t.Description, t.ServiceType, t.Status, t.OrganizationID, t.CreatorID, t.Version)
+	err := row.Scan(&t.ID, &t.Name, &t.Description, &t.ServiceType, &t.Status, &t.OrganizationID, &t.CreatorID, &t.Version)
 	if err != nil {
-		return err
+		slog.Warn("error scanning row", "error", err, "query", query)
+		return nil, errors.New("error scanning row")
 	}
-	t.Version = tender.Version + 1
-	return c.SaveTender(ctx, t)
+	return t, nil
 }
 
 func (c *postgresConnector) GetTenderByIdAndVersion(ctx context.Context, id string, version int) (*model.Tender, error) {
@@ -263,7 +298,7 @@ func (c *postgresConnector) RollbackTender(ctx context.Context, id string, versi
 		return nil, err
 	}
 	tender.Version = maxVersion + 1
-	return tender, c.SaveTender(ctx, tender)
+	return c.SaveTender(ctx, tender)
 }
 
 func NewPostgresConnector(cfg *config.Config) (DbConnector, error) {
