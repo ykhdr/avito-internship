@@ -5,22 +5,19 @@ import (
 	"net/http"
 	"zadanie-6105/config"
 	"zadanie-6105/database"
-	"zadanie-6105/store"
 )
 
 type Server struct {
-	serverAddress  string
-	organizationDb database.OrganizationConnector
-	tenderStore    *store.TenderStore
-	r              *mux.Router
+	serverAddress string
+	db            database.DbConnector
+	r             *mux.Router
 }
 
-func NewServer(cfg *config.Config, db database.OrganizationConnector) *Server {
+func NewServer(cfg *config.Config, db database.DbConnector) *Server {
 	s := &Server{
-		serverAddress:  cfg.ServerAddress,
-		organizationDb: db,
-		r:              mux.NewRouter().PathPrefix("/api").Subrouter(),
-		tenderStore:    store.NewTendersStore(),
+		serverAddress: cfg.ServerAddress,
+		db:            db,
+		r:             mux.NewRouter().PathPrefix("/api").Subrouter(),
 	}
 	s.r.HandleFunc("/ping", s.ping).Methods(http.MethodGet)
 	s.r.HandleFunc("/tenders", s.tenders).Methods(http.MethodGet)

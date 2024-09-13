@@ -17,10 +17,11 @@ const (
 )
 
 var availableServiceTypes = []string{"Construction", "Delivery", "Manufacture"}
-var availableStatuses = []model.TenderStatus{model.Created, model.Published, model.Closed}
+var availableTenderStatuses = []model.TenderStatus{model.TenderCreated, model.TenderPublished, model.TenderClosed}
+var availableBidStatuses = []model.BidStatus{model.BidCreated, model.BidPublished, model.BidCanceled}
 
-func IsValidStatus(status string) bool {
-	return slices.Contains(availableStatuses, model.TenderStatus(status))
+func IsValidTenderStatus(status string) bool {
+	return slices.Contains(availableTenderStatuses, model.TenderStatus(status))
 }
 
 func IsValidServiceType(serviceType string) bool {
@@ -28,16 +29,16 @@ func IsValidServiceType(serviceType string) bool {
 }
 
 func IsTenderAvailable(t *model.Tender, employee *model.Employee) bool {
-	return t.Status == model.Published || t.CreatorID == employee.ID
+	return t.Status == model.TenderPublished || t.CreatorID == employee.ID
 }
 
 type Validator struct {
 	w              http.ResponseWriter
 	r              *http.Request
-	organizationDb database.OrganizationConnector
+	organizationDb database.DbConnector
 }
 
-func NewValidator(w http.ResponseWriter, r *http.Request, organizationDb database.OrganizationConnector) *Validator {
+func NewValidator(w http.ResponseWriter, r *http.Request, organizationDb database.DbConnector) *Validator {
 	return &Validator{w: w, r: r, organizationDb: organizationDb}
 }
 
@@ -83,7 +84,7 @@ func (v *Validator) ValidateUuid(uuidValue string) bool {
 }
 
 func (v *Validator) ValidateStatus(status string) bool {
-	if !IsValidStatus(status) {
+	if !IsValidTenderStatus(status) {
 		v.w.WriteHeader(http.StatusBadRequest)
 		resp := ErrResponse{Reason: "status is not valid"}
 		_ = json.NewEncoder(v.w).Encode(resp)

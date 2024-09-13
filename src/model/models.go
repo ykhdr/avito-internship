@@ -15,9 +15,24 @@ const (
 type TenderStatus string
 
 const (
-	Created   TenderStatus = "Created"
-	Published TenderStatus = "Published"
-	Closed    TenderStatus = "Closed"
+	TenderCreated   TenderStatus = "Created"
+	TenderPublished TenderStatus = "Published"
+	TenderClosed    TenderStatus = "Closed"
+)
+
+type BidStatus string
+
+const (
+	BidCreated   BidStatus = "Created"
+	BidPublished BidStatus = "Published"
+	BidCanceled  BidStatus = "Canceled"
+)
+
+type AuthorType string
+
+const (
+	AuthorUser         AuthorType = "User"
+	AuthorOrganization AuthorType = "Organization"
 )
 
 type Organization struct {
@@ -55,4 +70,16 @@ type Tender struct {
 	CreatorID      string
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
+}
+
+type Bid struct {
+	ID        string
+	Name      string
+	Status    BidStatus
+	Author    AuthorType
+	AuthorId  string
+	TenderId  string
+	Version   int
+	CratedAt  time.Time
+	UpdatedAt time.Time
 }

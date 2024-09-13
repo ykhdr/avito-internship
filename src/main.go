@@ -27,7 +27,7 @@ func main() {
 	runHttpServer(cfg, dbConnector)
 }
 
-func runHttpServer(cfg *config.Config, dbConnector database.OrganizationConnector) {
+func runHttpServer(cfg *config.Config, dbConnector database.DbConnector) {
 	srv := server.NewServer(cfg, dbConnector)
 	slog.Debug("start http server")
 	router := srv.Router()
