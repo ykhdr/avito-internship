@@ -1,30 +1,41 @@
 ## Структура проекта
-В данном проекте находится типовой пример для сборки приложения в докере из находящящегося в проекте Dockerfile. Пример на Gradle используется исключительно в качестве шаблона, вы можете переписать проект как вам хочется - главное, что бы Dockerfile находился в корне проекта и приложение отвечало по порту 8080. Других требований нет.
+В данном проекте находится решение тестового задания на стажировку Авито 2024.
 
 ## Задание
 В папке "задание" размещена задача.
 
 ## Сбор и развертывание приложения
-Приложение должно отвечать по порту `8080` (жестко задано в настройках деплоя). После деплоя оно будет доступно по адресу: `https://<имя_проекта>-<уникальный_идентификатор_группы_группы>.avito2024.codenrock.com`
 
-Пример: Для кода из репозитория `/avito2024/cnrprod-team-27437/task1` сформируется домен
+Для развертывания приложения необходимо установить следующие переменные окружения
 
-```
-task1-5447.avito2024.codenrock.com
-```
+- `SERVER_ADDRESS` — адрес и порт, который будет слушать HTTP сервер при запуске. Пример: 0.0.0.0:8080.
+- `POSTGRES_CONN` — URL-строка для подключения к PostgreSQL в формате postgres://{username}:{password}@{host}:{5432}/{dbname}.
+- `POSTGRES_JDBC_URL` — JDBC-строка для подключения к PostgreSQL в формате jdbc:postgresql://{host}:{port}/{dbname}.
+- `POSTGRES_USERNAME` — имя пользователя для подключения к PostgreSQL.
+- `POSTGRES_PASSWORD` — пароль для подключения к PostgreSQL.
+- `POSTGRES_HOST` — хост для подключения к PostgreSQL (например, localhost).
+- `POSTGRES_PORT` — порт для подключения к PostgreSQL (например, 5432).
+- `POSTGRES_DATABASE` — имя базы данных PostgreSQL, которую будет использовать приложение.
 
-**Для удобства домен указывается в логе сборки**
+Для сборки Docker-контейнера приложения используется Dockerfile, расположенный в корневой директории проекта. Следуйте этим шагам для сборки и запуска контейнера:
 
-Логи сборки проекта находятся на вкладке **CI/CD** -> **Jobs**.
+1. Выполните команду для сборки Docker-образа:
+    ```bash
+    docker build -t avito-internship-app:latest .
+    ```
+    Здесь `-t avito-internship-app:latest` задает имя (`avito-internship-app`) и тег (`latest`) для создаваемого образа. Тег можно изменить по своему усмотрению.
 
-Ссылка на собранный проект находится на вкладке **Deployments** -> **Environment**. Вы можете сразу открыть URL по кнопке "Open".
-
-## Доступ к сервисам
-
-### Kubernetes
-На вашу команду выделен kubernetes namespace. Для подключения к нему используйте утилиту `kubectl` и `*.kube.config` файл, который вам выдадут организаторы.
-
-Состояние namespace, работающие pods и логи приложений можно посмотреть по адресу [https://dashboard.avito2024.codenrock.com/](https://dashboard.avito2024.codenrock.com/). Для открытия дашборда необходимо выбрать авторизацию через Kubeconfig и указать путь до выданного вам `*.kube.config` файла
-
-
-
+2. После успешной сборки образа запустите контейнер:
+    ```bash
+    docker run -d --name avito-internship-app \
+    -e SERVER_ADDRESS=0.0.0.0:8080 \
+    -e POSTGRES_CONN=postgres://user:password@localhost:5432/dbname \
+    -e POSTGRES_JDBC_URL=jdbc:postgresql://localhost:5432/dbname \
+    -e POSTGRES_USERNAME=user \
+    -e POSTGRES_PASSWORD=password \
+    -e POSTGRES_HOST=localhost \
+    -e POSTGRES_PORT=5432 \
+    -e POSTGRES_DATABASE=dbname \
+    -p 8080:8080 \
+    avito-internship-app:latest
+    ```
